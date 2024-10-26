@@ -42,6 +42,95 @@
 %Contexte, présentation du problème à résoudre et de la solution proposée, résumé du document : méthodologie utilisée, résultats principaux obtenus, impact sur le mandat. Attention, ici le problème à résoudre n’est pas le mandat lui-même, mais bien le problème posé spécifiquement pour le travail préparatoire.
 \section{Méthodes}
 
+Considérons un système 4f.
+
+Soit $U_0(x_0,y_0)$ l'intensité en fonction de la position $(x_0,y_0)$ sur le premier plan focal (plan 0), en entrée du système 4f. L'information sur si on envoie la lumière à travers une fente, un trou ou sans écran est décrite par cette fonction.
+
+Soit $M(x_1,y_1)$ le masque correspondant au réseau de diffraction au deuxième plan focal (plan 1), au milieu du système 4f.
+
+Soit $U_2(x_2,y_2)$ l'intensité en fonction de la position $(x_2,y_2)$ sur le troisième et dernier plan focal (plan 2), en sortie du système 4f. Le signal reçu par la caméra est décrit par cette fonction.
+
+Il est possible de montrer (voir document du mandat 2) que 
+
+\begin{equation}
+    U_2(x_2,y_2) \propto
+    \mathcal{F}\{M(x_1,y_1)\}(\frac{x_2}{\lambda f})
+    * U_0(-x_2,-y_2)
+\end{equation}
+
+Où $f$ est la distance focale, et $\lambda$ la longueur d'onde de lumière dont on veut étudier la propagation.
+
+Dans (Harvey and Pfisterer, 2019), on a:
+
+$
+    \mathcal{F}\{M(x_1,y_1)\}(\xi)= \delta(\xi-\theta_0/\lambda) * \\
+    \left(sinc[d\xi-n_B\lambda_B/\lambda][comb(d\xi)]d \right)
+    \\
+    \Rightarrow
+    \mathcal{F}\{M(x_1,y_1)\}(\xi-\theta_0/\lambda)= \\
+    sinc[d\xi-n_B\lambda_B/\lambda][comb(d\xi)]d
+$
+
+(équation 59, p.17)
+
+où $n_B$ et $\lambda_B$ sont respectivement l'ordre et la longueur d'onde sélectionnés par le réseau de diffraction, $d$ le pas du réseau de diffraction et $\theta_0$ l'angle entre l'axe optique et l'axe normal au plan du réseau de diffraction.
+
+On a utilisé le fait qu'une convolution avec un delta de Dirac donne une translation.
+
+$
+f(x)*\delta(x+k)\\
+=\int_{-\infty}^{\infty}f(t)\delta(x+k-t)dt\\
+= f(x+k)
+$
+
+Avec la fonction $comb(x)$ qui suit
+
+$comb(x)=\sum_{k=-\infty}^{\infty}\delta(x+k)$
+
+On a donc, pour une convolution de $comb(d(\xi+\theta_0/\lambda))=comb(d(x_2/\lambda f+\theta_0/\lambda))=comb((x_2+f\theta_0)d/\lambda f)$, on décale donc $x_2$ de $k\lambda f / d - f\theta_0$ , avec $k$ entier pour chaque pic du peigne. Ainsi,
+
+$U_2 \propto \sum_{k=-\infty}^{\infty}sinc[d(x_2/\lambda f+\theta_0/\lambda)-n_B\lambda_B/\lambda + k] U_0(-x_2-k\lambda f / d + f\theta_0, y_2)$
+
+Le modèle de réseau de diffraction utilisé est le GR25-0605 de Thorlabs, qui est paramétré pour le premier ordre, donc $n_B=1$, $\lambda_B=0.6$µm et $d=\frac{1}{0.6}$µm. En gardant les unités de distance en µm, on a donc:
+
+$U_2 \propto \sum_{k=-\infty}^{\infty}sinc[(x_2+f\theta_0)/0.6 \lambda f-0.6/\lambda + k] U_0(-x_2-k\lambda f / d + f\theta_0, y_2)$.
+
+Ce modèle assume une surface des composantes optiques (lentilles et réseau de diffraction) qui est infinie. Pour prendre la taille finie des composantes, il faudrait multiplier le masque de chaque composante par une fonction marche de la même largeur que la composante. Pour une solution plus simple, on pourrait se contenter de dire que l'intensité lumineuse ainsi perdue est négligeable si un faisceau gaussien passant par l'ouverture au premier plan focal ne déborde pas hors de la première lentille.
+
+Soit la largeur $w$ d'un faisceau gaussien dans l'air. Alors,
+
+$w(f)=w_0 \sqrt{1+(\frac{f}{z_R})^2}= a\sqrt{1+(\frac{\lambda f}{\pi a^2})^2} $
+
+Où $w_0=a$ est la largeur la plus faible du faisceau gaussien (largeur à la taille) et $z_R$ est la longueur de Rayleigh.
+
+Les lentilles disponibles ont un rayon de 1", donc en gardant les unités de distances en pouces;
+
+$
+a\sqrt{1+(\frac{\lambda f}{\pi a^2})^2} \leq 1\\
+\Rightarrow a^2+(\frac{\lambda f}{\pi a})^2 \leq 1 \\
+\Rightarrow a^4-a^2+(\frac{\lambda f}{\pi})^2 \leq 0 \\
+\Rightarrow
+a^2 \leq \frac{1}{2}(1+\sqrt{1-4(\frac{\lambda f}{\pi})^2})\\
+$
+et \\
+$a^2 \geq \frac{1}{2}(1-\sqrt{1-4(\frac{\lambda f}{\pi})^2})$
+
+et \\
+$1-4(\frac{\lambda f}{\pi})^2 \geq 0 \\
+\Rightarrow \lambda f \leq \frac{\pi}{2}$".
+
+
+Ce modèle ne donne pas non plus l'intensité absolue en sortie, seulement une valeur relative. Il faut donc prendre en compte que plus l'ouverture en entrée est petite, moins il y aura de lumière en sortie, ce qui pourrait causer des problème si on approche la limite de sensibilité de la caméra.
+
+Pour une fente de largeur $a$:\\ 
+    $U_0(x_0,y_0)=rect(\frac{x_0}{a})$
+
+Pour un trou de rayon $a$:\\ 
+    $U_0(x_0,y_0)=rect(\frac{\sqrt{x_0^2+y_0^2}}{a})$
+
+S'il n'y a pas d'écran: \\
+    $U_0(x_0,y_0)=1$
+
 %Transformer cette question dans un langage mathématique, décrire les méthodes de simulations
 \section{Résultats}
 
