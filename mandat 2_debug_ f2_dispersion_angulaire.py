@@ -1,118 +1,94 @@
 import numpy as np
-from numpy.fft import fft, ifft, fftshift, ifftshift
 import matplotlib.pyplot as plt
-from scipy import signal
 
-def define_parameters():
+def setup_parameters(f2_value):
+    # Convert angle from degrees and minutes to radians
+    blaze_angle_deg = 8 + 37/60  # 8 degrees 37 minutes
+    blaze_angle = np.deg2rad(blaze_angle_deg)
+    
+    # Given parameters in mm
+    wavelengths = np.array([400, 500, 600, 700]) * 1e-6  # wavelengths in mm (from nm)
+    m = 1  # Diffraction order
     grooves_per_mm = 600
-    blaze_angle = np.radians(8 + 37/60)
-    d = 1/grooves_per_mm  # in mm
-    N = 25/d  # 25mm divided by d(mm)
-    wavelengths = np.array([400e-6, 500e-6, 600e-6, 700e-6])  # in mm (e.g., 400nm = 400e-6 mm)
-    blaze_wavelength = 500e-6  # in mm
+    pitch = 1/grooves_per_mm  # Already in mm
+    f1 = 25  # mm
+    f2 = f2_value  # mm
+    a = 0.070  # aperture width in mm (70 μm)
     
     return {
         'blaze_angle': blaze_angle,
-        'blaze_wavelength': blaze_wavelength,
-        'grooves_per_mm': grooves_per_mm,
-        'N_g': grooves_per_mm,
-        'Lambda': d,
-        'N': N,
         'wavelengths': wavelengths,
+        'f1': f1,
+        'f2': f2,
+        'a': a,
+        'pitch': pitch
     }
 
-def calculate_Z1(x, a, wavelength, f1):
-    E_in = signal.windows.boxcar(len(x))
-    fx = x / (wavelength * f1)
-    Z1 = a * np.sinc(a * fx)
-    return Z1
-def calculate_intensity_1D(Z1, x, params, wavelength, f1, f2):
-    Lambda = params['Lambda']
-    N = params['N']
-    blaze_angle = params['blaze_angle']
+def calculate_intensity(x, params, wavelength):
+    """Calculate the normalized intensity distribution"""
+    # Calculate diffraction angle for this wavelength
+    theta = np.arcsin(wavelength/params['pitch'])  # First order m=1
     
-    # Calculate beta
-    beta = 2 * (2 * np.pi * np.tan(blaze_angle)) / wavelength
+    # Calculate expected peak position - direct f2 scaling
+    x_peak = params['f2'] * np.tan(theta)
     
-    # Modified rect_arg to have narrower width (0.2mm instead of 0.5mm)
-    rect_arg = (x - wavelength*f2/Lambda) / 0.1  # Reduced width to 0.2mm
+    # Calculate the scaled position relative to peak position
+    x_scaled = (x - x_peak)/(wavelength*params['f2']/params['a'])
     
-    # Calculate the rect function
-    rect = np.where(np.abs(rect_arg) <= 1.0, 1, 0)
+    # Calculate the phase term (must be dimensionless)
+    phase = 2 * np.pi * params['f2'] * np.sin(params['blaze_angle']) / params['pitch']
     
-    # Calculate sinc term
-    sinc_term = np.sinc(-Lambda * beta)
-    
-    # Calculate total intensity
-    intensity = rect * (sinc_term)**2
+    # Calculate the complete response and its intensity
+    response = np.sinc(x_scaled) * np.cos(phase)
+    intensity = np.abs(response)**2
     
     return intensity / np.max(intensity)
 
-def plot_1D_subplot(ax, x, Z1_dict, f1, f2):
-    plot_params = {
-        'xlabel': 'Position (mm)',
-        'ylabel': 'Intensity',
-        'title': f'f1={f1}mm, f2={f2}mm',
-        'xlim': (-0.1, 9),  # Small negative range to show left edge
-        'ylim': (0, 1.1),
-        'camera_position': 5.2,
-        'wavelengths': [400e-6, 500e-6, 600e-6, 700e-6],  # in mm
-        'colors': ['purple', 'blue', 'cyan', 'red']
-    }
+def plot_for_f2(f2_value, ax):
+    # Setup parameters
+    params = setup_parameters(f2_value)
     
-    # Calculate 400nm peak position
-    reference_wavelength = 400e-6
-    reference_intensity = calculate_intensity_1D(Z1_dict[reference_wavelength], x, params, reference_wavelength, f1, f2)
+    # Create fixed position range in mm - same for all plots
+    x = np.linspace(0, 24, 1000)  # Fixed range for all plots
     
-    # Find where the 400nm peak starts (left edge)
-    nonzero_indices = np.where(reference_intensity > 0.01)[0]
-    if len(nonzero_indices) > 0:
-        left_edge_position = x[nonzero_indices[0]]
-    else:
-        left_edge_position = 0
+    # Colors for different wavelengths
+    colors = ['b', 'g', 'r', 'm']
+    wavelength_labels = ['400 nm', '500 nm', '600 nm', '700 nm']
     
-    # Plot each wavelength with shifted x axis
-    for wavelength, color in zip(plot_params['wavelengths'], plot_params['colors']):
-        intensity = calculate_intensity_1D(Z1_dict[wavelength], x, params, wavelength, f1, f2)
-        ax.plot(x - left_edge_position, intensity, color=color, label=f'{wavelength*1e6:.0f} nm')
+    # Plot each wavelength
+    for i, wavelength in enumerate(params['wavelengths']):
+        # Calculate normalized intensity
+        intensity = calculate_intensity(x, params, wavelength)
+        
+        # Plot intensity
+        ax.plot(x, intensity, color=colors[i], 
+               label=wavelength_labels[i], linewidth=2)
+        
+        # Print peak position for verification
+        theta = np.arcsin(wavelength/params['pitch'])
+        x_peak = f2_value * np.tan(theta)
+        print(f"f2={f2_value}mm, λ={wavelength*1e6}nm: peak at {x_peak:.2f}mm")
     
-    # Add camera line at fixed 5.2mm position
-    ax.axvline(x=5.2, color='black', linestyle='--', label='Camera')
-    
-    # Set labels and title
-    ax.set_xlabel(plot_params['xlabel'])
-    ax.set_ylabel(plot_params['ylabel'])
-    ax.set_title(plot_params['title'])
-    
-    # Set axis limits
-    ax.set_xlim(plot_params['xlim'])
-    ax.set_ylim(plot_params['ylim'])
-    
+    ax.set_title(f'f2 = {f2_value} mm')
     ax.grid(True, alpha=0.3)
-    ax.legend()
+    ax.legend(title='Wavelength', loc='upper right')
+    ax.set_ylabel('Normalized Intensity I(x)')
+    ax.set_xlabel('Position (mm)')
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_xlim(0, 24)
 
 def main():
-    global params
-    params = define_parameters()
+    # Create three subplots
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 15))
     
-    # Extended x range with higher resolution
-    x = np.linspace(-0.5, 15, 3000)  # Increased resolution
+    # Plot for each f2 value
+    plot_for_f2(10, ax1)
+    plot_for_f2(20, ax2)
+    plot_for_f2(40, ax3)
     
-    f1 = 25  # in mm
-    f2_values = [10, 20, 40]  # in mm
-    
-    fig_1d, axes_1d = plt.subplots(3, 1, figsize=(10, 15))
-    
-    for i, f2 in enumerate(f2_values):
-        Z1_dict = {}
-        for wavelength in params['wavelengths']:
-            Z1 = calculate_Z1(x, 1, wavelength, f1)
-            Z1_dict[wavelength] = Z1
-        
-        plot_1D_subplot(axes_1d[i], x, Z1_dict, f1, f2)
-    
-    fig_1d.suptitle('1D Spectral Peaks for Different f2 Values')
+    plt.suptitle('Main Peaks - Normalized Intensity Distribution\nAperture = 70μm, f1 = 25 mm', y=0.95)
     plt.tight_layout()
     plt.show()
+
 if __name__ == "__main__":
     main()
