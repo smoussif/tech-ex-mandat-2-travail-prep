@@ -40,33 +40,40 @@ def gaussian(x, amp, cen, wid):
 def lorentzian(x, amp, cen, wid):
     return amp * wid**2 / ((x - cen)**2 + wid**2)
 
-# Extract peak intensity profile
+# Extract peak mean intensity profile
 def get_peak_intensity_profile(image):
-    y_max = np.argmax(np.max(image, axis=1))
-    max_profile = image[y_max, :] / np.max(image[y_max, :])
-    return max_profile, y_max
+    y_max, x_max = np.unravel_index(np.argmax(image), image.shape)
+    valid_y = [y for y in range(image.shape[0]) if image[y, x_max] >= 0.95 * image[y_max, x_max]]
+    profiles = [image[y, :] / np.max(image[y, :]) for y in valid_y]
+    mean_profile = np.mean(profiles, axis=0)
+    return mean_profile, y_max
 
 # Model fitting process
 def lmfit_process(profile):
     x = np.arange(len(profile))
     sigma = peak_widths(profile, [np.argmax(profile)], rel_height=0.99)[0][0]
+
+    # Fit models with constraints
+    gmodel_gauss = Model(gaussian)
+    gmodel_lorentz = Model(lorentzian)
     
-    # Fit models
-    gmodel_gauss, gmodel_lorentz = Model(gaussian), Model(lorentzian)
     params_gauss = gmodel_gauss.make_params(amp=np.max(profile), cen=np.argmax(profile), wid=sigma)
     params_lorentz = gmodel_lorentz.make_params(amp=np.max(profile), cen=np.argmax(profile), wid=sigma)
     
+    params_gauss['wid'].min = 0  # Prevent negative width
+    params_lorentz['wid'].min = 0  # Prevent negative width
+
     result_gauss = gmodel_gauss.fit(profile, params_gauss, x=x)
     result_lorentz = gmodel_lorentz.fit(profile, params_lorentz, x=x)
-    
-    # Choose best fit
+
+    # Choose the best fit
     best_result, best_fit_label = (result_gauss, "Gaussian Fit") if result_gauss.chisqr < result_lorentz.chisqr else (result_lorentz, "Lorentzian Fit")
-    
+
     x_mean = best_result.params['cen'].value
     width = best_result.params['wid'].value
     delta_x_mean = best_result.params['cen'].stderr or 0
     delta_width = best_result.params['wid'].stderr or 0
-    
+
     return x, best_result.best_fit, best_fit_label, x_mean, delta_x_mean, width, delta_width
 
 # Generate faded colors
@@ -86,16 +93,34 @@ def calculate_lambda(profile, image_dict):
         blue_profile, _ = get_peak_intensity_profile(image_dict['Blue'])
         red_profile, _ = get_peak_intensity_profile(image_dict['Red'])
         
-        _, _, _, x_mean_b, _, _, _ = lmfit_process(blue_profile)
-        _, _, _, x_mean_r, _, _, _ = lmfit_process(red_profile)
+        _, _, _, x_mean_b, _, width_b, _ = lmfit_process(blue_profile)
+        _, _, _, x_mean_r, _, width_r, _ = lmfit_process(red_profile)
 
         lambda_b = (constants["lambda_blue"] + constants["pixel_size"] * constants["pitch"] / constants["f2"] * 
                     (x_mean_i - x_mean_b - width_i * constants["f2"] / constants["f1"])) * 1e6
         lambda_r = (constants["lambda_red"] - constants["pixel_size"] * constants["pitch"] / constants["f2"] * 
                     (x_mean_r - x_mean_i - width_i / 2)) * 1e6
-        lambda_mean = np.mean([lambda_b, lambda_r])
+
+        if x_mean_i != x_mean_b and x_mean_i != x_mean_r:
+            lambda_value = np.array([lambda_b, lambda_r])
+            value_weight = np.array([
+                width_r / (np.abs(x_mean_i - x_mean_b) * (width_b + width_r)), 
+                width_b / (np.abs(x_mean_i - x_mean_r) * (width_b + width_r))
+            ])
+        else:
+            lambda_value = np.array([lambda_b, lambda_r])
+            value_weight = np.array([
+                width_r / (width_b + width_r), 
+                width_b / (width_b + width_r)
+            ])
+        
+        # Normalize weights
+        value_weight /= np.sum(value_weight)
+
+        lambda_mean = np.average(lambda_value, weights=value_weight)
 
         return lambda_b, lambda_r, lambda_mean
+    
     except KeyError as e:
         raise KeyError("Missing required color profile for wavelength calculation") from e
 
@@ -121,14 +146,19 @@ lambda_stats = []
 for label, img in images.items():
     profile, _ = get_peak_intensity_profile(img)
     x_fit, best_fit, best_fit_label, x_mean, delta_x_mean, width, delta_width = lmfit_process(profile)
-    
+
+    # Check and correct negative width
+    if width < 0:
+        width = 0
+        delta_width = 0
+
     # Calculate wavelengths in nm
     lambda_b, lambda_r, lambda_mean = calculate_lambda(profile, images)
-    
+
     # Append stats for DataFrame
     stats.append([label, x_mean, delta_x_mean, width, delta_width])
     lambda_stats.append([label, lambda_b, lambda_r, lambda_mean])
-    
+
     # Faded line plots
     fade_colors = generate_fade_colors(base_colors[label], num_shades=7)
     for i, fade_color in enumerate(fade_colors):
@@ -143,7 +173,7 @@ fig_line.update_layout(title="Intensity Profiles", xaxis_title="X Position", yax
 fig_line.show()
 
 # Display stats DataFrame
-stats_df = pd.DataFrame(stats, columns=["Couleur", "x maximum", "Erreur sur le x maximum", "Résolution", "Erreur sur la résolution"]).sort_values(by="x maximum")
+stats_df = pd.DataFrame(stats, columns=["Couleur", "x maximum", "Erreur sur x", "Résolution", "Erreur sur la résolution"]).sort_values(by="x maximum")
 lambda_df = pd.DataFrame(lambda_stats, columns=["Couleur", "Lambda (Ref : Blue, nm)", "Lambda (Ref : Red, nm)", "Lambda Mean (nm)"])
 
 print(stats_df)
