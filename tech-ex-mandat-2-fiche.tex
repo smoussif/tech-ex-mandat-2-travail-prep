@@ -33,8 +33,151 @@
 \captionsetup[figure]{name={Figure }}
 
 \begin{document}
-\include{presentation-fiche}
+\include{presentation}
 \twocolumn[]
+
+\section{Introduction}
+
+La conception d'un spectromètre se fait d'abord par la caractérisation du système optique utilisé. Ce système comprend entre autres un réseau de diffraction blazé entre deux lentilles dans une configuration 4F. Dans ce premier rapport, l'objectif est d'identifier tout les paramètres pertinents qui permettent d'observer un gamme de lumière visible entre 400 et 700 nm et de quantifier leur impact sur la résolution optique.
+Les paramètres discutés sont: l'angle de séparation du rayon diffracté, l'ordre de diffraction, les longueures focales des lentilles, la taille et le nombre de fentes, le pas du réseau de diffraction, la dimension des pixels, le chromatisme des lentilles et plus. L'optique de Fourier sera exploitée au travers du rapport pour atteindre l'objecif posé. 
+Dans ce qui suit, les modèles mathématiques ainsi que leur applications en language Python seront présentés. Les signaux spectraux seront ensuite présentés dans les résultats. Puis, une analyse de ses résultats permettront de discuter et d'évaluer une paramétrisation optimale des variables du spectromètre concu. 
+%Contexte, présentation du problème à résoudre et de la solution proposée, résumé du document : méthodologie utilisée, résultats principaux obtenus, impact sur le mandat. Attention, ici le problème à résoudre n’est pas le mandat lui-même, mais bien le problème posé spécifiquement pour le travail préparatoire.
+\section{Méthodes}
+
+Pour la suite de l'expérience, l'approximation paraxiale est appliquée tel que suit. 
+
+\begin{equation}
+    \sin\theta \sim  \theta\text{, }\tan\theta \sim \theta\text{ et }\cos\theta \sim 1
+\end{equation}
+ Cette approxiamation est valable car comme vu sur la table optique de la figure \ref{} les lentilles sont très proches au réseau de diffraction par rapport à leur distances focales, ce qui veux dire que les angles impliqués sont assez petits. Cette approximation a tout de même un rôle dans les limitations de l'exprérience discutées plus tard. \cite{article}
+
+
+En analysant les composantes du système 4F de la figure \ref{4F}, il est possible de trouver l'équation d'intensité au détecteur de la caméra. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{4F.png}
+    \caption{Schéma du corrélateur 4F provenant du procédurier \cite{mandat}}
+    \label{4F}
+\end{figure}
+$U_0(x_0,y_0)$ est l'intensité en fonction de la position $(x_0,y_0)$ sur le premier plan focal (plan 0), en entrée du système 4f. L'information sur si on envoie la lumière à travers une fente, un trou ou sans écran est décrite par cette fonction.
+
+$M(x_1,y_1)$ est le masque correspondant au réseau de diffraction au deuxième plan focal correspondant au plan de Fourier (plan 1), au milieu du système 4f.
+
+$U_2(x_2,y_2)$ est l'intensité en fonction de la position $(x_2,y_2)$ sur le troisième et dernier plan focal (plan 2), en sortie du système 4f. Le signal reçu par la caméra est décrit par cette fonction.
+
+Il est possible de montrer que 
+
+\begin{equation}
+    U_2(x_2,y_2) \propto
+    \mathcal{F}\{M(x_1,y_1)\}(\frac{x_2}{\lambda f})
+    * U_0(-x_2,-y_2)
+\end{equation}
+
+Où $f$ est la distance focale, et $\lambda$ la longueur d'onde de lumière dont on veut étudier la propagation. L'équation (59) obtenue à la page 17 de l'article est la suivante.\cite{article}
+\begin{align*}
+    \mathcal{F}\{M(x_1,y_1)\}(\xi)= \delta(\xi-\theta_0/\lambda) * \\
+    \left(sinc[d\xi-n_B\lambda_B/\lambda][comb(d\xi)]d \right)
+    \\
+    \Rightarrow
+    \mathcal{F}\{M(x_1,y_1)\}(\xi-\theta_0/\lambda)= \\
+    sinc[d\xi-n_B\lambda_B/\lambda][comb(d\xi)]d
+\end{align*}
+
+
+où $n_B$ et $\lambda_B$ sont respectivement l'ordre et la longueur d'onde sélectionnés par le réseau de diffraction, $d$ le pas du réseau de diffraction et $\theta_0$ l'angle entre l'axe optique et l'axe normal au plan du réseau de diffraction.
+
+La convolution avec un delta de Dirac donne une translation selon les propriétés de cette fonction.
+
+\begin{align*}
+    f(x)*\delta(x+k) &= \int_{-\infty}^{\infty} f(t) \delta(x+k-t) \, dt \\   
+    &= f(x+k)
+\end{align*}
+Avec la convolution de $comb(x)=\sum_{k=-\infty}^{\infty}\delta(x+k)$
+
+On obtient,   
+\begin{align*}
+    comb(d(\xi+\theta_0/\lambda))&=comb(d(x_2/\lambda f+\theta_0/\lambda))
+    \\&=comb((x_2+f\theta_0)d/\lambda f)
+\end{align*}
+
+En décalant $x_2$ de $k\lambda f / d - f\theta_0$ , avec $k$ entier pour chaque pic du peigne, l'intensité devient:
+
+
+\begin{align*}
+    U_2 \propto \sum_{k=-\infty}^{\infty}&sinc[d(x_2/\lambda f+\theta_0/\lambda)-n_B\lambda_B/\lambda + k] \\
+    &U_0(-x_2-k\lambda f / d + f\theta_0, y_2)
+\end{align*}
+
+
+Le modèle de réseau de diffraction utilisé est le GR25-0605 de Thorlabs, qui est paramétré pour le premier ordre, donc $n_B=1$, $\lambda_B=0.6$µm et $d=\frac{1}{0.6}$µm. \cite{thorlab-gratting} En gardant les unités de distance en µm, on a donc:
+\begin{align*}
+    U_2 \propto \sum_{k=-\infty}^{\infty}&sinc[(x_2+f\theta_0)/0.6 \lambda f-0.6/\lambda + k]\\
+    &U_0(-x_2-k\lambda f / d + f\theta_0, y_2)
+\end{align*}
+
+
+Ce modèle assume une surface des composantes optiques (lentilles et réseau de diffraction) qui est infinie. Pour prendre la taille finie des composantes, il faudrait multiplier le masque de chaque composante par une fonction marche de la même largeur que la composante. Pour une solution plus simple, on pourrait se contenter de dire que l'intensité lumineuse ainsi perdue est négligeable si un faisceau gaussien passant par l'ouverture au premier plan focal ne déborde pas hors de la première lentille.
+
+Soit la largeur $w$ d'un faisceau gaussien dans l'air. Alors,
+
+$w(f)=w_0 \sqrt{1+(\frac{f}{z_R})^2}= a\sqrt{1+(\frac{\lambda f}{\pi a^2})^2} $
+
+Où $w_0=a$ est la largeur la plus faible du faisceau gaussien (largeur à la taille) et $z_R$ est la longueur de Rayleigh.
+
+Les lentilles disponibles ont un rayon de 1", donc en gardant les unités de distances en pouces;
+$
+a\sqrt{1+(\frac{\lambda f}{\pi a^2})^2} \leq 1\\
+\Rightarrow a^2+(\frac{\lambda f}{\pi a})^2 \leq 1 \\
+\Rightarrow a^4-a^2+(\frac{\lambda f}{\pi})^2 \leq 0 \\
+\Rightarrow
+a^2 \leq \frac{1}{2}(1+\sqrt{1-4(\frac{\lambda f}{\pi})^2})\\
+$
+et \\
+$a^2 \geq \frac{1}{2}(1-\sqrt{1-4(\frac{\lambda f}{\pi})^2})$
+
+et \\
+$1-4(\frac{\lambda f}{\pi})^2 \geq 0 \\
+\Rightarrow \lambda f \leq \frac{\pi}{2}$. (En pouces carrés).
+
+
+Ce modèle ne donne pas non plus l'intensité absolue en sortie, seulement une valeur relative. Il faut donc prendre en compte que plus l'ouverture en entrée est petite, moins il y aura de lumière en sortie, ce qui pourrait causer des problème si on approche la limite de sensibilité de la caméra.
+Pour une fente de largeur $a$:\\ 
+    $U_0(x_0,y_0)=rect(\frac{x_0}{a})$
+
+Pour un trou de rayon $a$:\\ 
+    $U_0(x_0,y_0)=rect(\frac{\sqrt{x_0^2+y_0^2}}{a})$
+
+S'il n'y a pas d'écran: \\
+    $U_0(x_0,y_0)=1$
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{réseau.png}
+    \caption{Réseau de diffraction blazé}
+    \label{réseau}
+\end{figure}
+
+La différence de longueur d'onde de signaux centré à des ordres subséquents équivaut à la résolution cherché. Pour un réseau de diffraction blasé, la résolution peut être déduite de la façon suivante.
+\begin{equation}
+    \lambda_1-\lambda_0=\frac{L_D d cos(\theta_B)}{n_B f}
+\end{equation}
+où $L_D$ est la longueur du spectre détecté, $d$ est la période de fente, $\theta_B$ est l'angle de sortie du réseau de diffraction, $n_B$ est l'ordre e f est la distance focale des lentilles. $n_B$ est fixé à 1 et $L_D$ équivaut au nombre total de pixel ($n$) multiplié par la largeur d'un pixel ($W_p$). L'équation de résolution devient donc:
+
+\begin{equation}
+    R_B=\frac{n W_p d cos(\theta_B)}{ f}
+\end{equation}
+
+Ainsi, une maximisation de $n$, $W_p$, $\theta_B$ et à la fois une minimisation de $f$ résulte à une résolution idéale.\cite{res_blasé}
+%Transformer cette question dans un langage mathématique, décrire les méthodes de simulations
+\section{Résultats}
+
+%Résultats choisis, obtenus à l’aide des Méthodes et permettant d’informer la Discussion. Attention, ici, les résultats doivent être décrits de façon factuelle, mais ne doivent pas être discutés. Typiquement des figures et des tableaux seront utilisés et le texte décrira de façon neutre les aspects importants des tableaux et figures à remarquer. Plus d’attention devra être portée aux variables qui ont un effet (positif ou négatif) et moins d’attention sera portée aux variables n’ayant pas ou peu d’effet.
+\section{Discussion}
+
+
+%Présentation et interprétation des principes, des relations et des généralisations pouvant être déduits des résultats. Description des exceptions à ces généralisations si présentes. Description des limitations du modèle. Recommandation convaincante sur la démarche à suivre pour remplir le mandat.
+\end{document}
 
 \section{Introduction}
 
