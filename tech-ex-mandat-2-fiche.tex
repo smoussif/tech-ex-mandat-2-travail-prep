@@ -1,1 +1,40 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage{float}
+\usepackage{here}
+\usepackage{parskip}
+\usepackage{subfigure}
+\usepackage{pdfpages}
+\usepackage{multicol}
+\usepackage{biblatex}
+\usepackage{amsmath,amssymb}
 
+\newcommand*\Laplace{\mathop{}\!\mathbin\bigtriangleup}
+\newcommand*\DAlambert{\mathop{}\!\mathbin\Box}
+\addbibresource{bibli.bib}
+
+\lstset{
+  language=Latex, % Set the language to Python
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{teal},
+  stringstyle=\color{red},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=5pt,
+  breaklines=true,
+}
+
+\DeclareCaptionLabelFormat{mycaptionlabel}{#1 #2}
+\captionsetup[table]{labelsep=colon}
+\captionsetup[figure]{labelsep=colon}
+\captionsetup{labelformat=mycaptionlabel}
+\captionsetup[table]{name={Tableau }}
+\captionsetup[figure]{name={Figure }}
+
+\begin{document}
+\include{presentation-fiche}
+\twocolumn[]
+
+\section{Introduction}
+\end{document}
