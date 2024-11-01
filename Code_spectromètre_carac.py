@@ -44,9 +44,10 @@ def lorentzian(x, amp, cen, wid):
 def get_peak_intensity_profile(image):
     y_max, x_max = np.unravel_index(np.argmax(image), image.shape)
     valid_y = [y for y in range(image.shape[0]) if image[y, x_max] >= 0.95 * image[y_max, x_max]]
+    profile_max = image[y_max, :] / np.max(image[y_max, :])
     profiles = [image[y, :] / np.max(image[y, :]) for y in valid_y]
     mean_profile = np.mean(profiles, axis=0)
-    return mean_profile, y_max
+    return profile_max, y_max
 
 # Model fitting process
 def lmfit_process(profile):
@@ -97,9 +98,9 @@ def calculate_lambda(profile, image_dict):
         _, _, _, x_mean_r, _, width_r, _ = lmfit_process(red_profile)
 
         lambda_b = (constants["lambda_blue"] + constants["pixel_size"] * constants["pitch"] / constants["f2"] * 
-                    (x_mean_i - x_mean_b - width_i * constants["f2"] / constants["f1"])) * 1e6
+                    (x_mean_i - x_mean_b - width_b * constants["f2"] / constants["f1"])) * 1e6
         lambda_r = (constants["lambda_red"] - constants["pixel_size"] * constants["pitch"] / constants["f2"] * 
-                    (x_mean_r - x_mean_i - width_i / 2)) * 1e6
+                    (x_mean_r - x_mean_i - width_b / 2)) * 1e6
 
         if x_mean_i != x_mean_b and x_mean_i != x_mean_r:
             lambda_value = np.array([lambda_b, lambda_r])
@@ -160,7 +161,7 @@ for label, img in images.items():
     lambda_stats.append([label, lambda_b, lambda_r, lambda_mean])
 
     # Faded line plots
-    fade_colors = generate_fade_colors(base_colors[label], num_shades=7)
+    fade_colors = generate_fade_colors(base_colors[label], num_shades=0)
     for i, fade_color in enumerate(fade_colors):
         intermediate_profile = profile + (best_fit - profile) * (i + 1) / len(fade_colors)
         fig_line.add_trace(go.Scatter(x=np.arange(len(profile)), y=intermediate_profile, mode='lines', line=dict(color=fade_color), showlegend=False))
