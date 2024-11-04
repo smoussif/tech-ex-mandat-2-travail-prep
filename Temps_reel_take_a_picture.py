@@ -163,11 +163,11 @@ def live_plot(doc, frame_queue):
 
     doc.add_periodic_callback(update, 50)  # Update every 50 ms
 
-def gaussian(x, amp, cen, wid):
-    return amp * np.exp(-(x - cen)**2 / (2 * wid**2))
+def gaussian(x, amp, cen, wid, offset):
+    return amp * np.exp(-(x - cen)**2 / (2 * wid**2)) + offset
 
-def lorentzian(x, amp, cen, wid):
-    return amp * wid**2 / ((x - cen)**2 + wid**2)
+def lorentzian(x, amp, cen, wid, offset):
+    return amp * wid**2 / ((x - cen)**2 + wid**2) + offset
 
 def lmfit_process(profile):
     """Fit the intensity profile using Gaussian and Lorentzian models."""
@@ -177,8 +177,8 @@ def lmfit_process(profile):
     gmodel_gauss = Model(gaussian)
     gmodel_lorentz = Model(lorentzian)
 
-    params_gauss = gmodel_gauss.make_params(amp=np.max(profile), cen=np.argmax(profile), wid=sigma)
-    params_lorentz = gmodel_lorentz.make_params(amp=np.max(profile), cen=np.argmax(profile), wid=sigma)
+    params_gauss = gmodel_gauss.make_params(amp=np.max(profile), cen=np.argmax(profile), wid=sigma, offset=0)
+    params_lorentz = gmodel_lorentz.make_params(amp=np.max(profile), cen=np.argmax(profile), wid=sigma, offset=0)
 
     result_gauss = gmodel_gauss.fit(profile, params_gauss, x=x)
     result_lorentz = gmodel_lorentz.fit(profile, params_lorentz, x=x)
